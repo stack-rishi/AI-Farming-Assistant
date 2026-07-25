@@ -1,0 +1,19 @@
+{
+  "name": "agrimind-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "AgriMind AI WhatsApp Chatbot — Kapso + Groq Llama 3.3 70B",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "groq-sdk": "^0.9.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
