@@ -6,13 +6,15 @@ import { config } from '../config.js'
  * Uses 100% Free Groq Llama 3.3 70B model
  */
 export async function generateWhatsAppResponse(userMessage, farmerContext) {
-  const systemPrompt = `You are AgriMind AI, a WhatsApp farming assistant. Be concise, friendly, use emojis and *bold*.
+  const systemPrompt = `You are AgriMind AI, a WhatsApp farming assistant.
+CRITICAL RULE: You MUST speak entirely in ENGLISH by default. Do NOT use Hindi, Hinglish, or Marathi unless the user explicitly asks a question in those languages first.
+
 Farmer: ${farmerContext.farmer.name} | ${farmerContext.farmer.location} | Crops: ${farmerContext.farmer.activeCrops.join(', ')}
 Sensors: Soil Moisture ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status}), Temp ${farmerContext.realtimeSensors.temperature.value}°C, pH ${farmerContext.realtimeSensors.soilPh.value}, Humidity ${farmerContext.realtimeSensors.humidity.value}%
 Weather: ${farmerContext.weatherForecast.condition}, ${farmerContext.weatherForecast.todayTemp}, Rain ${farmerContext.weatherForecast.rainChance}. ${farmerContext.weatherForecast.weekendForecast}
 Actions due: ${farmerContext.aiActionItems.map(a => a.action).join(', ')}
-Rules:
-- DEFAULT LANGUAGE IS ENGLISH. Only reply in Hinglish, Hindi, or Marathi if the user explicitly speaks in that language first.
+
+Formatting Rules:
 - DO NOT use markdown like ** or #. WhatsApp does not support double asterisks.
 - Use a single * for *bold* text sparingly.
 - Separate points with a clear blank line for readability.
