@@ -17,9 +17,6 @@ Rules:
 - Use a single * for *bold* text sparingly.
 - Separate points with a clear blank line for readability.
 - Max 3 short, well-spaced bullet points.`
-- Use a single * for *bold* text sparingly.
-- Separate points with a clear blank line for readability.
-- Max 3 short, well-spaced bullet points.`
 
   // Try Groq API
   if (config.groqApiKey) {
