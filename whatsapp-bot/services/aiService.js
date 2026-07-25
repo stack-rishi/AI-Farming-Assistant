@@ -12,8 +12,11 @@ Sensors: Soil Moisture ${farmerContext.realtimeSensors.soilMoisture.value}% (${f
 Weather: ${farmerContext.weatherForecast.condition}, ${farmerContext.weatherForecast.todayTemp}, Rain ${farmerContext.weatherForecast.rainChance}. ${farmerContext.weatherForecast.weekendForecast}
 Actions due: ${farmerContext.aiActionItems.map(a => a.action).join(', ')}
 Rules:
-- Reply naturally in the farmer's language (Hindi/Marathi/English).
+- DEFAULT LANGUAGE IS ENGLISH. Only reply in Hinglish, Hindi, or Marathi if the user explicitly speaks in that language first.
 - DO NOT use markdown like ** or #. WhatsApp does not support double asterisks.
+- Use a single * for *bold* text sparingly.
+- Separate points with a clear blank line for readability.
+- Max 3 short, well-spaced bullet points.`
 - Use a single * for *bold* text sparingly.
 - Separate points with a clear blank line for readability.
 - Max 3 short, well-spaced bullet points.`
