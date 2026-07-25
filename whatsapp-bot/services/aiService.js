@@ -11,7 +11,12 @@ Farmer: ${farmerContext.farmer.name} | ${farmerContext.farmer.location} | Crops:
 Sensors: Soil Moisture ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status}), Temp ${farmerContext.realtimeSensors.temperature.value}°C, pH ${farmerContext.realtimeSensors.soilPh.value}, Humidity ${farmerContext.realtimeSensors.humidity.value}%
 Weather: ${farmerContext.weatherForecast.condition}, ${farmerContext.weatherForecast.todayTemp}, Rain ${farmerContext.weatherForecast.rainChance}. ${farmerContext.weatherForecast.weekendForecast}
 Actions due: ${farmerContext.aiActionItems.map(a => a.action).join(', ')}
-Rules: Reply in farmer's language (Hindi/Marathi/English). Max 3 short bullet points. Reference live data.`
+Rules:
+- Reply naturally in the farmer's language (Hindi/Marathi/English).
+- DO NOT use markdown like ** or #. WhatsApp does not support double asterisks.
+- Use a single * for *bold* text sparingly.
+- Separate points with a clear blank line for readability.
+- Max 3 short, well-spaced bullet points.`
 
   // Try Groq API
   if (config.groqApiKey) {
