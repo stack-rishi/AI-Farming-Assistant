@@ -1,0 +1,8 @@
+# Ignore these when building the Docker image
+node_modules
+npm-debug.log
+.env
+.env.local
+.git
+.gitignore
+README.md
