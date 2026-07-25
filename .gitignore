@@ -12,6 +12,10 @@ dist/
 .env.staging
 whatsapp-bot/.env
 
+# SSH Keys — NEVER commit these
+*.pem
+*.key
+
 # OS files
 .DS_Store
 Thumbs.db
