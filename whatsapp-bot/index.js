@@ -37,31 +37,35 @@ app.post('/kapso-webhook', async (req, res) => {
 
   console.log('📩 RAW WEBHOOK BODY:', JSON.stringify(body, null, 2))
 
-  // 1. Support Kapso conversation payload (body.conversation.last_message_text & phone_number)
-  if (body.conversation && body.conversation.last_message_text) {
-    const incomingText = body.conversation.last_message_text
-    const senderPhone = body.conversation.phone_number
-    const messageId = body.conversation.last_message_id
+  // 1. Support Kapso non-debounced payload (body.message)
+  if (body.message) {
+    const messageObj = body.message
+    const direction = messageObj?.kapso?.direction
+    
+    // Only process inbound text messages
+    if (direction === 'inbound') {
+      const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
+      const senderPhone = messageObj?.from
+      const messageId = messageObj?.id
 
-    if (incomingText && senderPhone) {
-      await processMessage(senderPhone, incomingText, messageId)
-      return
+      if (incomingText && senderPhone) {
+        await processMessage(senderPhone, incomingText, messageId)
+        return
+      }
     }
   }
 
-  // 2. Support Kapso data[] format
+  // 2. Support Kapso debounced data[] array format
   const dataItems = body.data || []
   for (const dataItem of dataItems) {
     const messageObj = dataItem?.message
-    const conversation = dataItem?.conversation
-
     if (!messageObj) continue
 
     const direction = messageObj?.kapso?.direction
     if (direction && direction !== 'inbound') continue
 
     const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
-    const senderPhone = messageObj?.from || conversation?.phone_number
+    const senderPhone = messageObj?.from || dataItem?.conversation?.phone_number
     const messageId = messageObj?.id
 
     if (incomingText && senderPhone) {
