@@ -61,24 +61,18 @@ app.post('/kapso-webhook', async (req, res) => {
     console.log(`\n🌾 [${new Date().toISOString()}] Message from [${senderPhone}]: "${incomingText}"`)
 
     try {
-      // 1. Mark message as READ (Blue Ticks)
+      // 1. Mark message as READ (Blue Ticks) & Show Typing Status in background (non-blocking)
       if (messageId) {
-        await markMessageAsRead(messageId)
+        markMessageAsRead(messageId)
       }
+      sendTypingIndicator(senderPhone)
 
-      // 2. Trigger Typing Indicator (shows "typing..." under profile & chat)
-      await sendTypingIndicator(senderPhone)
-
-      // 3. Fetch farmer dashboard context & generate AI response (with min 1.5s typing animation visibility)
-      const [farmerContext] = await Promise.all([
-        getFarmerDashboardContext(senderPhone),
-        new Promise(resolve => setTimeout(resolve, 1500)) // Keeps typing animation visible for 1.5s
-      ])
-
+      // 2. Fetch farmer dashboard context & generate AI response
+      const farmerContext = await getFarmerDashboardContext(senderPhone)
       const replyText = await generateWhatsAppResponse(incomingText, farmerContext)
       console.log(`🤖 AI Reply:\n${replyText}\n`)
 
-      // 4. Send reply back via Kapso API (clears typing indicator when sent)
+      // 3. Send reply back via Kapso API
       await sendKapsoReply(senderPhone, replyText)
     } catch (error) {
       console.error('❌ Error processing message:', error)
@@ -96,7 +90,7 @@ async function markMessageAsRead(messageId) {
 
   const url = `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'X-API-Key': apiKey,
@@ -108,7 +102,8 @@ async function markMessageAsRead(messageId) {
         message_id: messageId,
       }),
     })
-    console.log(`✓✓ Marked message [${messageId}] as READ (Blue Ticks)`)
+    const txt = await res.text()
+    console.log(`✓✓ Mark Read Status (${res.status}): ${txt}`)
   } catch (err) {
     console.error('❌ Error marking message read:', err.message)
   }
@@ -124,7 +119,7 @@ async function sendTypingIndicator(recipientPhone) {
 
   const url = `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'X-API-Key': apiKey,
@@ -140,7 +135,8 @@ async function sendTypingIndicator(recipientPhone) {
         }
       }),
     })
-    console.log(`💬 Typing indicator sent to [${recipientPhone}]`)
+    const txt = await res.text()
+    console.log(`💬 Typing Indicator Status (${res.status}): ${txt}`)
   } catch (err) {
     console.error('❌ Error sending typing indicator:', err.message)
   }
