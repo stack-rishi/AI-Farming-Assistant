@@ -6,30 +6,12 @@ import { config } from '../config.js'
  * Uses 100% Free Groq Llama 3.3 70B model
  */
 export async function generateWhatsAppResponse(userMessage, farmerContext) {
-  const systemPrompt = `
-You are AgriMind AI, a helpful, friendly, and expert farming assistant replying to a farmer on WhatsApp.
-
-FARMER'S REAL-TIME DASHBOARD DATA:
-- Farmer Name: ${farmerContext.farmer.name}
-- Location: ${farmerContext.farmer.location}
-- Total Land: ${farmerContext.farmer.totalAcres} Acres
-- Active Crops: ${farmerContext.farmer.activeCrops.join(', ')}
-- Health Score: ${farmerContext.farmer.healthScore} (${farmerContext.farmer.healthNote})
-- Soil Moisture: ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status})
-- Soil Temperature: ${farmerContext.realtimeSensors.temperature.value}°C
-- Air Humidity: ${farmerContext.realtimeSensors.humidity.value}%
-- Soil pH: ${farmerContext.realtimeSensors.soilPh.value} (${farmerContext.realtimeSensors.soilPh.status})
-- Weather Today: ${farmerContext.weatherForecast.condition}, ${farmerContext.weatherForecast.todayTemp}, Rain Chance: ${farmerContext.weatherForecast.rainChance}
-- Weekend Weather: ${farmerContext.weatherForecast.weekendForecast}
-- Action Items: ${farmerContext.aiActionItems.map(a => `${a.action}: ${a.detail}`).join('; ')}
-
-INSTRUCTIONS:
-1. Speak directly to the farmer using their name (${farmerContext.farmer.name}).
-2. Provide concise, clear, actionable advice suitable for WhatsApp reading (use bullet points, *bold text*, and friendly emojis).
-3. If asked in Hindi or Marathi, reply in that language. Otherwise, reply in English.
-4. Reference the farmer's live sensor data (e.g. soil moisture 68%, rain on Saturday) to make advice accurate.
-5. Keep your response within 2-4 short paragraphs.
-`
+  const systemPrompt = `You are AgriMind AI, a WhatsApp farming assistant. Be concise, friendly, use emojis and *bold*.
+Farmer: ${farmerContext.farmer.name} | ${farmerContext.farmer.location} | Crops: ${farmerContext.farmer.activeCrops.join(', ')}
+Sensors: Soil Moisture ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status}), Temp ${farmerContext.realtimeSensors.temperature.value}°C, pH ${farmerContext.realtimeSensors.soilPh.value}, Humidity ${farmerContext.realtimeSensors.humidity.value}%
+Weather: ${farmerContext.weatherForecast.condition}, ${farmerContext.weatherForecast.todayTemp}, Rain ${farmerContext.weatherForecast.rainChance}. ${farmerContext.weatherForecast.weekendForecast}
+Actions due: ${farmerContext.aiActionItems.map(a => a.action).join(', ')}
+Rules: Reply in farmer's language (Hindi/Marathi/English). Max 3 short bullet points. Reference live data.`
 
   // Try Groq API
   if (config.groqApiKey) {
@@ -40,9 +22,9 @@ INSTRUCTIONS:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
-        max_tokens: 500,
+        model: 'llama-3.1-8b-instant',  // 3-4x faster than 70B for WhatsApp
+        temperature: 0.6,
+        max_tokens: 200,                 // WhatsApp needs short replies
       })
       return chatCompletion.choices[0]?.message?.content
     } catch (error) {
