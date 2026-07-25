@@ -3,7 +3,7 @@ import { config } from '../config.js'
 
 /**
  * AI Service for AgriMind WhatsApp Bot
- * Uses 100% Free Groq Llama 3.3 70B model
+ * Uses Groq hosted Llama models (currently llama-3.1-8b-instant).
  */
 export async function generateWhatsAppResponse(userMessage, farmerContext) {
   const systemPrompt = `You are AgriMind AI, a WhatsApp farming assistant.
@@ -33,7 +33,8 @@ Formatting Rules:
         temperature: 0.6,
         max_tokens: 200,                 // WhatsApp needs short replies
       })
-      return chatCompletion.choices[0]?.message?.content
+      const content = chatCompletion.choices[0]?.message?.content
+      if (content) return content
     } catch (error) {
       console.error('Error calling Groq API:', error.message)
     }
@@ -48,7 +49,7 @@ function generateFallbackResponse(userMessage, farmerContext) {
   const name = farmerContext.farmer.name
 
   if (query.includes('water') || query.includes('irrigate') || query.includes('moisture') || query.includes('सिंचाई') || query.includes('पानी')) {
-    return `🌾 *Namaste ${name}!*\n\n*Soil Moisture:* 68% (Optimal)\n*Rain Forecast:* 70% chance of rain this Saturday.\n\n*Recommendation:*\nNo need to irrigate today! Your soil moisture is in the optimal range. Save water and wait until Sunday after evaluating weekend rainfall.`
+    return `🌾 *Namaste ${name}!*\n\n*Soil Moisture:* ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status})\n*Weather:* ${farmerContext.weatherForecast.condition}, Rain ${farmerContext.weatherForecast.rainChance}. ${farmerContext.weatherForecast.weekendForecast}\n\n*Recommendation:*\nBased on current soil moisture, irrigation may not be needed today. Re-check after the weekend rainfall forecast.`
   }
 
   if (query.includes('fertilizer') || query.includes('urea') || query.includes('खाद') || query.includes('खत')) {
@@ -56,8 +57,8 @@ function generateFallbackResponse(userMessage, farmerContext) {
   }
 
   if (query.includes('weather') || query.includes('rain') || query.includes('मौसम') || query.includes('पाऊस')) {
-    return `🌤️ *Namaste ${name}!*\n\n*Today's Weather in ${farmerContext.farmer.location}:*\n- Temp: 28°C (Partly Cloudy)\n- Rain Chance: 20%\n- *Weekend Outlook:* High chance of rain (70%) on Saturday!`
+    return `🌤️ *Namaste ${name}!*\n\n*Today's Weather in ${farmerContext.farmer.location}:*\n- Temp: ${farmerContext.weatherForecast.todayTemp} (${farmerContext.weatherForecast.condition})\n- Humidity: ${farmerContext.realtimeSensors.humidity.value}%\n- Rain Chance: ${farmerContext.weatherForecast.rainChance}\n- *Weekend Outlook:* ${farmerContext.weatherForecast.weekendForecast}`
   }
 
-  return `👨‍🌾 *Namaste ${name}!*\n\nHere is your live farm summary from *AgriMind*:\n- *Overall Health:* ${farmerContext.farmer.healthScore}\n- *Soil Moisture:* ${farmerContext.realtimeSensors.soilMoisture.value}% (Optimal)\n- *Next Action:* Apply Urea fertilizer top-dressing in 2 days.\n\nAsk me about *irrigation*, *fertilizer*, *pest risk*, or *weather forecast* anytime! 📲`
+  return `👨‍🌾 *Namaste ${name}!*\n\nHere is your live farm summary from *AgriMind*:\n- *Overall Health:* ${farmerContext.farmer.healthScore}\n- *Soil Moisture:* ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status})\n- *Next Action:* ${farmerContext.aiActionItems?.[0]?.action || 'No immediate actions'}.\n\nAsk me about *irrigation*, *fertilizer*, *pest risk*, or *weather forecast* anytime! 📲`
 }

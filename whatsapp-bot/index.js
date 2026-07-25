@@ -14,7 +14,7 @@ const PORT = config.port
 
 // Health check endpoint (Render uses this to keep the service alive)
 app.get('/', (req, res) => {
-  res.json({ status: 'online', service: 'AgriMind WhatsApp Bot', number: '+1 202-852-8477' })
+  res.json({ status: 'online', service: 'AgriMind WhatsApp Bot' })
 })
 
 // GET verification endpoint (Kapso may ping this)
@@ -222,5 +222,5 @@ app.listen(PORT, () => {
   console.log(`\n🟢 AgriMind WhatsApp Bot running on http://localhost:${PORT}`)
   console.log(`📱 WhatsApp Number: +1 202-852-8477`)
   console.log(`🔗 Webhook: http://localhost:${PORT}/kapso-webhook`)
-  console.log(`🤖 AI: Groq Llama 3.3 70B`)
+  console.log(`🤖 AI: Groq llama-3.1-8b-instant`)
 })
