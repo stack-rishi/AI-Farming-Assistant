@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 60" width="320" height="60">
+  <defs>
+    <linearGradient id="btnDemoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <filter id="btnGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect width="320" height="60" rx="30" fill="url(#btnDemoGrad)" filter="url(#btnGlow)"/>
+  <rect x="2" y="2" width="316" height="56" rx="28" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+  <text x="35" y="36" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="800" font-size="16" fill="#ffffff" letter-spacing="0.5">🌐 LAUNCH LIVE DASHBOARD</text>
+  <path d="M 280 30 L 270 23 L 270 37 Z" fill="#ffffff"/>
+</svg>

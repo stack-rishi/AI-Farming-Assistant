@@ -4,6 +4,19 @@
 
   <br/><br/>
 
+  <!-- PROMINENT CTA BUTTONS -->
+  <p align="center">
+    <a href="https://ai-farming-assistant-nu.vercel.app/" target="_blank">
+      <img src="assets/readme/btn-live-demo.svg" alt="Launch Live Dashboard" height="52" />
+    </a>
+    &nbsp;&nbsp;
+    <a href="https://wa.me/12028528477?text=Hi" target="_blank">
+      <img src="assets/readme/btn-whatsapp.svg" alt="Chat on WhatsApp" height="52" />
+    </a>
+  </p>
+
+  <br/>
+
   # 🌾 AgriMind — AI Farming Assistant & Autonomous WhatsApp Platform
 
   **Empowering Modern Agriculture with Real-time IoT Sensors, AI Crop Diagnostics, and 24/7 WhatsApp AI Advisory.**
@@ -29,7 +42,7 @@
 
 ---
 
-> 💡 **AgriMind** is an end-to-end intelligent agricultural platform designed to bridge the technology gap for smallholder and commercial farmers. It combines a premium **React + Vite SaaS dashboard** for deep farm analytics with an **autonomous WhatsApp AI Agent** powered by Groq's high-speed Llama 3.3 70B & 8B LLMs, providing actionable farming advice in real time.
+> 💡 **AgriMind** is an end-to-end intelligent agricultural platform designed to bridge the technology gap for smallholder and commercial farmers. It combines a premium **[React + Vite SaaS Dashboard](https://ai-farming-assistant-nu.vercel.app/)** for deep farm analytics with an **[Autonomous WhatsApp AI Agent (+1 202-852-8477)](https://wa.me/12028528477?text=Hi)** powered by Groq's high-speed Llama 3.3 70B & 8B LLMs, providing actionable farming advice in real time.
 
 ---
 
