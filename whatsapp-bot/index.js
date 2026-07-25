@@ -33,52 +33,68 @@ app.post('/kapso-webhook', async (req, res) => {
   const body = req.body
   if (!body) return
 
-  // Extract message from Kapso's webhook payload: body.data[0].message
-  const dataItems = body.data || []
+  console.log('📩 RAW WEBHOOK BODY:', JSON.stringify(body, null, 2))
 
+  console.log('📩 RAW WEBHOOK BODY:', JSON.stringify(body, null, 2))
+
+  // 1. Support Kapso data[] format
+  const dataItems = body.data || []
   for (const dataItem of dataItems) {
     const messageObj = dataItem?.message
     const conversation = dataItem?.conversation
 
     if (!messageObj) continue
 
-    // Skip outbound messages (only process inbound)
     const direction = messageObj?.kapso?.direction
     if (direction && direction !== 'inbound') continue
 
-    const incomingText =
-      messageObj?.text?.body ||
-      messageObj?.kapso?.content
-
-    const senderPhone =
-      messageObj?.from ||
-      conversation?.phone_number
-
+    const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
+    const senderPhone = messageObj?.from || conversation?.phone_number
     const messageId = messageObj?.id
 
-    if (!incomingText || !senderPhone) continue
+    if (incomingText && senderPhone) {
+      await processMessage(senderPhone, incomingText, messageId)
+    }
+  }
 
-    console.log(`\n🌾 [${new Date().toISOString()}] Message from [${senderPhone}]: "${incomingText}"`)
+  // 2. Support Meta raw webhook format (body.entry[0].changes[0].value.messages[0])
+  const entries = body.entry || []
+  for (const entry of entries) {
+    const changes = entry?.changes || []
+    for (const change of changes) {
+      const value = change?.value
+      const messages = value?.messages || []
+      for (const msg of messages) {
+        const incomingText = msg?.text?.body
+        const senderPhone = msg?.from
+        const messageId = msg?.id
 
-    try {
-      // 1. Mark message as READ (Blue Ticks) & Show Typing Status in background (non-blocking)
-      if (messageId) {
-        markMessageAsRead(messageId)
+        if (incomingText && senderPhone) {
+          await processMessage(senderPhone, incomingText, messageId)
+        }
       }
-      sendTypingIndicator(senderPhone)
-
-      // 2. Fetch farmer dashboard context & generate AI response
-      const farmerContext = await getFarmerDashboardContext(senderPhone)
-      const replyText = await generateWhatsAppResponse(incomingText, farmerContext)
-      console.log(`🤖 AI Reply:\n${replyText}\n`)
-
-      // 3. Send reply back via Kapso API
-      await sendKapsoReply(senderPhone, replyText)
-    } catch (error) {
-      console.error('❌ Error processing message:', error)
     }
   }
 })
+
+async function processMessage(senderPhone, incomingText, messageId) {
+  console.log(`\n🌾 [${new Date().toISOString()}] Message from [${senderPhone}]: "${incomingText}"`)
+
+  try {
+    if (messageId) {
+      markMessageAsRead(messageId)
+    }
+    sendTypingIndicator(senderPhone)
+
+    const farmerContext = await getFarmerDashboardContext(senderPhone)
+    const replyText = await generateWhatsAppResponse(incomingText, farmerContext)
+    console.log(`🤖 AI Reply:\n${replyText}\n`)
+
+    await sendKapsoReply(senderPhone, replyText)
+  } catch (error) {
+    console.error('❌ Error processing message:', error)
+  }
+}
 
 /**
  * Mark incoming message as READ (Triggers double blue ticks on sender's phone)
