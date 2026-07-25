@@ -61,20 +61,24 @@ app.post('/kapso-webhook', async (req, res) => {
     console.log(`\n🌾 [${new Date().toISOString()}] Message from [${senderPhone}]: "${incomingText}"`)
 
     try {
-      // 1. Instantly mark message as READ (Blue Ticks) & Show Typing Status
+      // 1. Mark message as READ (Blue Ticks)
       if (messageId) {
-        markMessageAsRead(messageId)
+        await markMessageAsRead(messageId)
       }
-      sendTypingIndicator(senderPhone)
 
-      // 2. Fetch farmer dashboard context
-      const farmerContext = await getFarmerDashboardContext(senderPhone)
+      // 2. Trigger Typing Indicator (shows "typing..." under profile & chat)
+      await sendTypingIndicator(senderPhone)
 
-      // 3. Generate AI response using Groq Llama 3.1 8B
+      // 3. Fetch farmer dashboard context & generate AI response (with min 1.5s typing animation visibility)
+      const [farmerContext] = await Promise.all([
+        getFarmerDashboardContext(senderPhone),
+        new Promise(resolve => setTimeout(resolve, 1500)) // Keeps typing animation visible for 1.5s
+      ])
+
       const replyText = await generateWhatsAppResponse(incomingText, farmerContext)
       console.log(`🤖 AI Reply:\n${replyText}\n`)
 
-      // 4. Send reply back via Kapso API (clears typing indicator automatically)
+      // 4. Send reply back via Kapso API (clears typing indicator when sent)
       await sendKapsoReply(senderPhone, replyText)
     } catch (error) {
       console.error('❌ Error processing message:', error)
