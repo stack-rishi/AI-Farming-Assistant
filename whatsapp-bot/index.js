@@ -37,7 +37,19 @@ app.post('/kapso-webhook', async (req, res) => {
 
   console.log('📩 RAW WEBHOOK BODY:', JSON.stringify(body, null, 2))
 
-  // 1. Support Kapso data[] format
+  // 1. Support Kapso conversation payload (body.conversation.last_message_text & phone_number)
+  if (body.conversation && body.conversation.last_message_text) {
+    const incomingText = body.conversation.last_message_text
+    const senderPhone = body.conversation.phone_number
+    const messageId = body.conversation.last_message_id
+
+    if (incomingText && senderPhone) {
+      await processMessage(senderPhone, incomingText, messageId)
+      return
+    }
+  }
+
+  // 2. Support Kapso data[] format
   const dataItems = body.data || []
   for (const dataItem of dataItems) {
     const messageObj = dataItem?.message
@@ -57,7 +69,7 @@ app.post('/kapso-webhook', async (req, res) => {
     }
   }
 
-  // 2. Support Meta raw webhook format (body.entry[0].changes[0].value.messages[0])
+  // 3. Support Meta raw webhook format (body.entry[0].changes[0].value.messages[0])
   const entries = body.entry || []
   for (const entry of entries) {
     const changes = entry?.changes || []
