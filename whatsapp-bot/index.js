@@ -54,25 +54,93 @@ app.post('/kapso-webhook', async (req, res) => {
       messageObj?.from ||
       conversation?.phone_number
 
+    const messageId = messageObj?.id
+
     if (!incomingText || !senderPhone) continue
 
     console.log(`\n🌾 [${new Date().toISOString()}] Message from [${senderPhone}]: "${incomingText}"`)
 
     try {
-      // 1. Fetch farmer dashboard context
+      // 1. Instantly mark message as READ (Blue Ticks) & Show Typing Status
+      if (messageId) {
+        markMessageAsRead(messageId)
+      }
+      sendTypingIndicator(senderPhone)
+
+      // 2. Fetch farmer dashboard context
       const farmerContext = await getFarmerDashboardContext(senderPhone)
 
-      // 2. Generate AI response using Groq Llama 3.3 70B
+      // 3. Generate AI response using Groq Llama 3.1 8B
       const replyText = await generateWhatsAppResponse(incomingText, farmerContext)
       console.log(`🤖 AI Reply:\n${replyText}\n`)
 
-      // 3. Send reply back via Kapso API
+      // 4. Send reply back via Kapso API (clears typing indicator automatically)
       await sendKapsoReply(senderPhone, replyText)
     } catch (error) {
       console.error('❌ Error processing message:', error)
     }
   }
 })
+
+/**
+ * Mark incoming message as READ (Triggers double blue ticks on sender's phone)
+ */
+async function markMessageAsRead(messageId) {
+  const apiKey = config.kapsoApiKey
+  const phoneNumberId = config.kapsoPhoneNumberId
+  if (!apiKey || !messageId) return
+
+  const url = `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: messageId,
+      }),
+    })
+    console.log(`✓✓ Marked message [${messageId}] as READ (Blue Ticks)`)
+  } catch (err) {
+    console.error('❌ Error marking message read:', err.message)
+  }
+}
+
+/**
+ * Send Typing Indicator (Shows "typing..." under bot name while generating response)
+ */
+async function sendTypingIndicator(recipientPhone) {
+  const apiKey = config.kapsoApiKey
+  const phoneNumberId = config.kapsoPhoneNumberId
+  if (!apiKey || !recipientPhone) return
+
+  const url = `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipientPhone,
+        type: 'typing_indicator',
+        typing_indicator: {
+          type: 'text'
+        }
+      }),
+    })
+    console.log(`💬 Typing indicator sent to [${recipientPhone}]`)
+  } catch (err) {
+    console.error('❌ Error sending typing indicator:', err.message)
+  }
+}
 
 /**
  * Send WhatsApp reply via Kapso Official API
