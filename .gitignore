@@ -15,6 +15,7 @@ whatsapp-bot/.env
 # SSH Keys — NEVER commit these
 *.pem
 *.key
+*.pub
 
 # OS files
 .DS_Store
