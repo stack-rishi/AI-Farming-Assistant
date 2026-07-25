@@ -141,7 +141,7 @@ Create a `.env` file inside `whatsapp-bot/`:
 ```env
 # Kapso Credentials (AgriMind Dedicated WhatsApp Line)
 KAPSO_API_KEY=your_kapso_api_key_here
-KAPSO_PHONE_NUMBER_ID=1179330158605218
+KAPSO_PHONE_NUMBER_ID=your_kapso_phone_number_id_here
 
 # Free Groq API Key (Llama 3.3 70B / 8B Models)
 GROQ_API_KEY=gsk_your_groq_api_key_here
