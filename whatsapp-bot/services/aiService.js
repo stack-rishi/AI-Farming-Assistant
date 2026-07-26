@@ -48,9 +48,13 @@ export async function transcribeAudio(audioBuffer, mimeType) {
 }
 
 
-export async function generateWhatsAppResponse(userMessage, farmerContext) {
+export async function generateWhatsAppResponse(userMessage, farmerContext, history = [], userLanguage = 'english') {
+  const languageRule = userLanguage === 'hindi'
+    ? 'LANGUAGE RULE: This farmer prefers Hindi/Hinglish. Respond naturally in Hindi or Hinglish.'
+    : 'LANGUAGE RULE: Respond in ENGLISH by default. Switch to Hindi/Marathi only if the farmer writes in those languages first.'
+
   const systemPrompt = `You are AgriMind AI, a WhatsApp farming assistant.
-CRITICAL RULE: You MUST speak entirely in ENGLISH by default. Do NOT use Hindi, Hinglish, or Marathi unless the user explicitly asks a question in those languages first.
+${languageRule}
 
 Farmer: ${farmerContext.farmer.name} | ${farmerContext.farmer.location} | Crops: ${farmerContext.farmer.activeCrops.join(', ')}
 Sensors: Soil Moisture ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status}), Temp ${farmerContext.realtimeSensors.temperature.value}°C, pH ${farmerContext.realtimeSensors.soilPh.value}, Humidity ${farmerContext.realtimeSensors.humidity.value}%
@@ -70,9 +74,10 @@ Formatting Rules:
       const chatCompletion = await groq.chat.completions.create({
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
+          ...history,                              // Inject conversation history
+          { role: 'user', content: userMessage }  // Current message last
         ],
-        model: 'llama-3.3-70b-versatile',  // Best quality model on free Groq tier (70B params)
+        model: 'llama-3.3-70b-versatile',
         temperature: 0.6,
         max_tokens: 200,
       })

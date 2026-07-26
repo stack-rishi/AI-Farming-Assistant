@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import { config } from './config.js'
 import { getFarmerDashboardContext } from './services/dashboardService.js'
 import { generateWhatsAppResponse, analyzeImageWithAI, transcribeAudio } from './services/aiService.js'
+import { getHistory, addExchange, detectAndSaveLanguage, getPreference } from './services/conversationService.js'
 
 dotenv.config()
 
@@ -158,11 +159,18 @@ async function processMessage(senderPhone, incomingText, messageId) {
     if (messageId) markMessageAsRead(messageId)
     sendTypingIndicator(senderPhone)
 
+    // Detect language and load conversation history
+    const userLanguage = detectAndSaveLanguage(senderPhone, incomingText)
+    const history = getHistory(senderPhone)
+
     const farmerContext = await getFarmerDashboardContext(senderPhone)
-    const replyText = await generateWhatsAppResponse(incomingText, farmerContext)
+    const replyText = await generateWhatsAppResponse(incomingText, farmerContext, history, userLanguage)
     console.log(`🤖 AI Reply:\n${replyText}\n`)
 
     await sendKapsoReply(senderPhone, replyText)
+
+    // Save this exchange to memory
+    addExchange(senderPhone, incomingText, replyText)
   } catch (error) {
     console.error('❌ Error processing text message:', error)
   }
@@ -230,11 +238,18 @@ async function processAudioMessage(senderPhone, directUrl, mimeType, messageId) 
 
     console.log(`📝 Transcript: "${transcript}"`)
 
+    // Load history and detect language from transcript
+    const userLanguage = detectAndSaveLanguage(senderPhone, transcript)
+    const history = getHistory(senderPhone)
+
     // Show the farmer what was heard, then answer
     const farmerContext = await getFarmerDashboardContext(senderPhone)
-    const reply = await generateWhatsAppResponse(transcript, farmerContext)
+    const reply = await generateWhatsAppResponse(transcript, farmerContext, history, userLanguage)
 
     await sendKapsoReply(senderPhone, `🎙️ *I heard:* "${transcript}"\n\n${reply}`)
+
+    // Save exchange to memory (store the transcript as the user message)
+    addExchange(senderPhone, transcript, reply)
   } catch (error) {
     console.error('❌ Error processing voice note:', error)
     await sendKapsoReply(senderPhone, `⚠️ Something went wrong processing your voice note. Please type your question and I will help!`)
