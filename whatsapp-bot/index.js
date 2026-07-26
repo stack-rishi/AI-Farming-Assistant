@@ -2,7 +2,7 @@ import express from 'express'
 import dotenv from 'dotenv'
 import { config } from './config.js'
 import { getFarmerDashboardContext } from './services/dashboardService.js'
-import { generateWhatsAppResponse } from './services/aiService.js'
+import { generateWhatsAppResponse, analyzeImageWithAI } from './services/aiService.js'
 
 dotenv.config()
 
@@ -25,7 +25,7 @@ app.get('/kapso-webhook', (req, res) => {
 
 /**
  * Kapso Webhook Receiver (POST /kapso-webhook)
- * Receives incoming WhatsApp messages from Kapso and replies with Groq AI.
+ * Receives incoming WhatsApp messages (text & images) from Kapso and replies with Groq AI.
  */
 app.post('/kapso-webhook', async (req, res) => {
   res.status(200).json({ status: 'received' })
@@ -35,19 +35,27 @@ app.post('/kapso-webhook', async (req, res) => {
 
   console.log('📩 RAW WEBHOOK BODY:', JSON.stringify(body, null, 2))
 
-  console.log('📩 RAW WEBHOOK BODY:', JSON.stringify(body, null, 2))
-
   // 1. Support Kapso non-debounced payload (body.message)
   if (body.message) {
     const messageObj = body.message
     const direction = messageObj?.kapso?.direction
-    
-    // Only process inbound text messages
+
     if (direction === 'inbound') {
-      const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
       const senderPhone = messageObj?.from
       const messageId = messageObj?.id
+      const msgType = messageObj?.type
 
+      // Handle image messages
+      if ((msgType === 'image' || messageObj?.image) && senderPhone) {
+        const imageId = messageObj?.image?.id
+        const mimeType = messageObj?.image?.mime_type || 'image/jpeg'
+        const caption = messageObj?.image?.caption || ''
+        await processImageMessage(senderPhone, imageId, mimeType, caption, messageId)
+        return
+      }
+
+      // Handle text messages
+      const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
       if (incomingText && senderPhone) {
         await processMessage(senderPhone, incomingText, messageId)
         return
@@ -64,10 +72,21 @@ app.post('/kapso-webhook', async (req, res) => {
     const direction = messageObj?.kapso?.direction
     if (direction && direction !== 'inbound') continue
 
-    const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
     const senderPhone = messageObj?.from || dataItem?.conversation?.phone_number
     const messageId = messageObj?.id
+    const msgType = messageObj?.type
 
+    // Handle image messages
+    if ((msgType === 'image' || messageObj?.image) && senderPhone) {
+      const imageId = messageObj?.image?.id
+      const mimeType = messageObj?.image?.mime_type || 'image/jpeg'
+      const caption = messageObj?.image?.caption || ''
+      await processImageMessage(senderPhone, imageId, mimeType, caption, messageId)
+      continue
+    }
+
+    // Handle text messages
+    const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
     if (incomingText && senderPhone) {
       await processMessage(senderPhone, incomingText, messageId)
     }
@@ -81,10 +100,21 @@ app.post('/kapso-webhook', async (req, res) => {
       const value = change?.value
       const messages = value?.messages || []
       for (const msg of messages) {
-        const incomingText = msg?.text?.body
         const senderPhone = msg?.from
         const messageId = msg?.id
+        const msgType = msg?.type
 
+        // Handle image messages
+        if (msgType === 'image' && senderPhone) {
+          const imageId = msg?.image?.id
+          const mimeType = msg?.image?.mime_type || 'image/jpeg'
+          const caption = msg?.image?.caption || ''
+          await processImageMessage(senderPhone, imageId, mimeType, caption, messageId)
+          continue
+        }
+
+        // Handle text messages
+        const incomingText = msg?.text?.body
         if (incomingText && senderPhone) {
           await processMessage(senderPhone, incomingText, messageId)
         }
@@ -93,13 +123,14 @@ app.post('/kapso-webhook', async (req, res) => {
   }
 })
 
+/**
+ * Process a plain text WhatsApp message.
+ */
 async function processMessage(senderPhone, incomingText, messageId) {
-  console.log(`\n🌾 [${new Date().toISOString()}] Message from [${senderPhone}]: "${incomingText}"`)
+  console.log(`\n🌾 [${new Date().toISOString()}] Text from [${senderPhone}]: "${incomingText}"`)
 
   try {
-    if (messageId) {
-      markMessageAsRead(messageId)
-    }
+    if (messageId) markMessageAsRead(messageId)
     sendTypingIndicator(senderPhone)
 
     const farmerContext = await getFarmerDashboardContext(senderPhone)
@@ -108,7 +139,97 @@ async function processMessage(senderPhone, incomingText, messageId) {
 
     await sendKapsoReply(senderPhone, replyText)
   } catch (error) {
-    console.error('❌ Error processing message:', error)
+    console.error('❌ Error processing text message:', error)
+  }
+}
+
+/**
+ * Process an image WhatsApp message.
+ * Downloads the image from WhatsApp media servers via Kapso proxy, then runs Groq Vision analysis.
+ */
+async function processImageMessage(senderPhone, imageId, mimeType, caption, messageId) {
+  console.log(`\n📸 [${new Date().toISOString()}] Image from [${senderPhone}] | ID: ${imageId} | Caption: "${caption}"`)
+
+  try {
+    if (messageId) markMessageAsRead(messageId)
+    sendTypingIndicator(senderPhone)
+
+    // Send an immediate acknowledgement so the farmer knows we're working
+    await sendKapsoReply(senderPhone, `📸 Got your image! Analyzing it with AgriMind AI...
+
+This takes a few seconds. Stand by! 🌾`)
+
+    // Download image and convert to base64
+    const imageBase64 = await downloadWhatsAppMedia(imageId)
+
+    if (!imageBase64) {
+      await sendKapsoReply(senderPhone, `⚠️ Sorry, I could not download your image. Please try sending it again, or describe your crop issue in text and I will help you!`)
+      return
+    }
+
+    sendTypingIndicator(senderPhone)
+
+    // Analyze image with Groq Vision AI
+    const farmerContext = await getFarmerDashboardContext(senderPhone)
+    const analysis = await analyzeImageWithAI(imageBase64, mimeType, farmerContext)
+
+    console.log(`🔬 Vision Analysis:\n${analysis}\n`)
+    await sendKapsoReply(senderPhone, analysis)
+  } catch (error) {
+    console.error('❌ Error processing image message:', error)
+    await sendKapsoReply(senderPhone, `⚠️ Something went wrong while analyzing your image. Please try again or describe the crop issue in text!`)
+  }
+}
+
+/**
+ * Download WhatsApp media via Kapso proxy and return base64-encoded string.
+ * Kapso proxies the Meta media download endpoint so no separate Meta token is needed.
+ */
+async function downloadWhatsAppMedia(mediaId) {
+  const apiKey = config.kapsoApiKey
+  const phoneNumberId = config.kapsoPhoneNumberId
+  if (!apiKey || !mediaId) return null
+
+  try {
+    // Step 1: Get the media download URL
+    const metaUrl = `https://api.kapso.ai/meta/whatsapp/v24.0/${mediaId}`
+    const metaRes = await fetch(metaUrl, {
+      headers: { 'X-API-Key': apiKey }
+    })
+
+    if (!metaRes.ok) {
+      console.error(`❌ Failed to get media URL. Status: ${metaRes.status}`, await metaRes.text())
+      return null
+    }
+
+    const mediaData = await metaRes.json()
+    const downloadUrl = mediaData?.url
+
+    if (!downloadUrl) {
+      console.error('❌ No download URL in media metadata:', mediaData)
+      return null
+    }
+
+    console.log(`📥 Downloading media from: ${downloadUrl}`)
+
+    // Step 2: Download the actual image bytes via Kapso proxy
+    const imgRes = await fetch(downloadUrl, {
+      headers: { 'X-API-Key': apiKey }
+    })
+
+    if (!imgRes.ok) {
+      console.error(`❌ Failed to download media. Status: ${imgRes.status}`)
+      return null
+    }
+
+    // Convert to base64
+    const arrayBuffer = await imgRes.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    console.log(`✅ Media downloaded and base64 encoded (${Math.round(base64.length / 1024)}KB)`)
+    return base64
+  } catch (err) {
+    console.error('❌ Error downloading WhatsApp media:', err.message)
+    return null
   }
 }
 
@@ -176,8 +297,6 @@ async function sendTypingIndicator(recipientPhone) {
 
 /**
  * Send WhatsApp reply via Kapso Official API
- * Endpoint: POST https://api.kapso.ai/meta/whatsapp/v24.0/{phone_number_id}/messages
- * Auth: X-API-Key header
  */
 async function sendKapsoReply(recipientPhone, text) {
   const apiKey = config.kapsoApiKey
@@ -222,5 +341,5 @@ app.listen(PORT, () => {
   console.log(`\n🟢 AgriMind WhatsApp Bot running on http://localhost:${PORT}`)
   console.log(`📱 WhatsApp Number: +1 202-852-8477`)
   console.log(`🔗 Webhook: http://localhost:${PORT}/kapso-webhook`)
-  console.log(`🤖 AI: Groq llama-3.1-8b-instant`)
+  console.log(`🤖 AI: Groq llama-3.1-8b-instant + llama-4-scout Vision`)
 })

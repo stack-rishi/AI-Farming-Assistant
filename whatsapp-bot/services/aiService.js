@@ -4,6 +4,7 @@ import { config } from '../config.js'
 /**
  * AI Service for AgriMind WhatsApp Bot
  * Uses Groq hosted Llama models (currently llama-3.1-8b-instant).
+ * Vision analysis uses meta-llama/llama-4-scout-17b-16e-instruct.
  */
 export async function generateWhatsAppResponse(userMessage, farmerContext) {
   const systemPrompt = `You are AgriMind AI, a WhatsApp farming assistant.
@@ -42,6 +43,82 @@ Formatting Rules:
 
   // Fallback rules engine
   return generateFallbackResponse(userMessage, farmerContext)
+}
+
+/**
+ * Analyze a crop/field image using Groq Vision (llama-4-scout).
+ * @param {string} imageBase64 - base64-encoded image string
+ * @param {string} mimeType    - MIME type e.g. 'image/jpeg'
+ * @param {object} farmerContext - live farmer dashboard context
+ * @returns {Promise<string>} AI analysis reply
+ */
+export async function analyzeImageWithAI(imageBase64, mimeType, farmerContext) {
+  if (!config.groqApiKey) {
+    return `⚠️ Image analysis is currently unavailable. Please send a text description of your crop issue and I will help you!`
+  }
+
+  const name = farmerContext.farmer.name
+  const crops = farmerContext.farmer.activeCrops.join(', ')
+  const location = farmerContext.farmer.location
+
+  const systemPrompt = `You are AgriMind AI, an expert agricultural plant pathologist and crop advisor.
+CRITICAL RULE: Respond only in ENGLISH unless the farmer writes in another language first.
+
+Farmer: ${name} | Location: ${location} | Active Crops: ${crops}
+Soil Moisture: ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status})
+Temperature: ${farmerContext.realtimeSensors.temperature.value}°C | Humidity: ${farmerContext.realtimeSensors.humidity.value}%
+
+Your job is to analyze the image the farmer sent and provide:
+1. What you can see in the image (plant, leaf, field, pest, soil, etc.)
+2. Any visible problems: disease, pest damage, nutrient deficiency, weed infestation, or water stress
+3. Specific actionable recommendation: treatment, pesticide, fertilizer, or care step with dosage if possible
+4. Urgency level: Low / Medium / High
+
+Formatting Rules:
+- DO NOT use markdown like ** or #.
+- Use single * for *bold* sparingly.
+- Keep response under 200 words, well-spaced for WhatsApp readability.
+- If the image is not a crop or farming related image, politely say so and ask them to send a plant/field photo.`
+
+  try {
+    const groq = new Groq({ apiKey: config.groqApiKey })
+
+    const chatCompletion = await groq.chat.completions.create({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`
+              }
+            },
+            {
+              type: 'text',
+              text: 'Please analyze this image from my farm and give me your expert diagnosis and recommendation.'
+            }
+          ]
+        }
+      ],
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      temperature: 0.4,
+      max_tokens: 300,
+    })
+
+    const content = chatCompletion.choices[0]?.message?.content
+    if (content) return content
+
+    return `🌾 I received your image, ${name}, but could not generate an analysis right now. Please try again or describe the problem in text.`
+  } catch (error) {
+    console.error('❌ Error in Groq Vision API:', error.message)
+    return `🌾 *Image Analysis Failed*
+
+Sorry ${name}, I was unable to analyze your image at this moment.
+
+Please describe your crop issue in text and I will help you right away! 🌱`
+  }
 }
 
 function generateFallbackResponse(userMessage, farmerContext) {
