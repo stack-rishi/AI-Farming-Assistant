@@ -45,12 +45,13 @@ app.post('/kapso-webhook', async (req, res) => {
       const messageId = messageObj?.id
       const msgType = messageObj?.type
 
-      // Handle image messages
+      // Handle image messages — Kapso provides direct download URL in the payload
       if ((msgType === 'image' || messageObj?.image) && senderPhone) {
-        const imageId = messageObj?.image?.id
         const mimeType = messageObj?.image?.mime_type || 'image/jpeg'
         const caption = messageObj?.image?.caption || ''
-        await processImageMessage(senderPhone, imageId, mimeType, caption, messageId)
+        // Use Kapso's pre-signed direct URL (no separate API call needed)
+        const directUrl = messageObj?.image?.link || messageObj?.kapso?.media_url || messageObj?.kapso?.media_data?.url
+        await processImageMessage(senderPhone, directUrl, mimeType, caption, messageId)
         return
       }
 
@@ -76,12 +77,12 @@ app.post('/kapso-webhook', async (req, res) => {
     const messageId = messageObj?.id
     const msgType = messageObj?.type
 
-    // Handle image messages
+    // Handle image messages — use Kapso's direct URL from the payload
     if ((msgType === 'image' || messageObj?.image) && senderPhone) {
-      const imageId = messageObj?.image?.id
       const mimeType = messageObj?.image?.mime_type || 'image/jpeg'
       const caption = messageObj?.image?.caption || ''
-      await processImageMessage(senderPhone, imageId, mimeType, caption, messageId)
+      const directUrl = messageObj?.image?.link || messageObj?.kapso?.media_url || messageObj?.kapso?.media_data?.url
+      await processImageMessage(senderPhone, directUrl, mimeType, caption, messageId)
       continue
     }
 
@@ -104,12 +105,12 @@ app.post('/kapso-webhook', async (req, res) => {
         const messageId = msg?.id
         const msgType = msg?.type
 
-        // Handle image messages
+        // Handle image messages — use direct URL if provided
         if (msgType === 'image' && senderPhone) {
-          const imageId = msg?.image?.id
           const mimeType = msg?.image?.mime_type || 'image/jpeg'
           const caption = msg?.image?.caption || ''
-          await processImageMessage(senderPhone, imageId, mimeType, caption, messageId)
+          const directUrl = msg?.image?.link || msg?.image?.url
+          await processImageMessage(senderPhone, directUrl, mimeType, caption, messageId)
           continue
         }
 
@@ -147,27 +148,22 @@ async function processMessage(senderPhone, incomingText, messageId) {
  * Process an image WhatsApp message.
  * Downloads the image from WhatsApp media servers via Kapso proxy, then runs Groq Vision analysis.
  */
-async function processImageMessage(senderPhone, imageId, mimeType, caption, messageId) {
-  console.log(`\n📸 [${new Date().toISOString()}] Image from [${senderPhone}] | ID: ${imageId} | Caption: "${caption}"`)
+async function processImageMessage(senderPhone, directUrl, mimeType, caption, messageId) {
+  console.log(`\n📸 [${new Date().toISOString()}] Image from [${senderPhone}] | URL: ${directUrl} | Caption: "${caption}"`)
 
   try {
     if (messageId) markMessageAsRead(messageId)
-    sendTypingIndicator(senderPhone)
 
     // Send an immediate acknowledgement so the farmer knows we're working
-    await sendKapsoReply(senderPhone, `📸 Got your image! Analyzing it with AgriMind AI...
+    await sendKapsoReply(senderPhone, `📸 Got your image! Analyzing it with AgriMind AI...\n\nThis takes a few seconds. Stand by! 🌾`)
 
-This takes a few seconds. Stand by! 🌾`)
-
-    // Download image and convert to base64
-    const imageBase64 = await downloadWhatsAppMedia(imageId)
+    // Download image bytes from the direct Kapso URL and convert to base64
+    const imageBase64 = await downloadWhatsAppMedia(directUrl)
 
     if (!imageBase64) {
       await sendKapsoReply(senderPhone, `⚠️ Sorry, I could not download your image. Please try sending it again, or describe your crop issue in text and I will help you!`)
       return
     }
-
-    sendTypingIndicator(senderPhone)
 
     // Analyze image with Groq Vision AI
     const farmerContext = await getFarmerDashboardContext(senderPhone)
@@ -182,53 +178,31 @@ This takes a few seconds. Stand by! 🌾`)
 }
 
 /**
- * Download WhatsApp media via Kapso proxy and return base64-encoded string.
- * Kapso proxies the Meta media download endpoint so no separate Meta token is needed.
+ * Download image from the direct Kapso pre-signed URL and return base64-encoded string.
+ * Kapso provides the full direct URL in the webhook payload — no extra API call needed.
  */
-async function downloadWhatsAppMedia(mediaId) {
-  const apiKey = config.kapsoApiKey
-  const phoneNumberId = config.kapsoPhoneNumberId
-  if (!apiKey || !mediaId) return null
+async function downloadWhatsAppMedia(directUrl) {
+  if (!directUrl) {
+    console.error('❌ No image URL provided')
+    return null
+  }
 
   try {
-    // Step 1: Get the media download URL
-    const metaUrl = `https://api.kapso.ai/meta/whatsapp/v24.0/${mediaId}`
-    const metaRes = await fetch(metaUrl, {
-      headers: { 'X-API-Key': apiKey }
-    })
+    console.log(`📥 Downloading image from Kapso URL: ${directUrl}`)
 
-    if (!metaRes.ok) {
-      console.error(`❌ Failed to get media URL. Status: ${metaRes.status}`, await metaRes.text())
-      return null
-    }
-
-    const mediaData = await metaRes.json()
-    const downloadUrl = mediaData?.url
-
-    if (!downloadUrl) {
-      console.error('❌ No download URL in media metadata:', mediaData)
-      return null
-    }
-
-    console.log(`📥 Downloading media from: ${downloadUrl}`)
-
-    // Step 2: Download the actual image bytes via Kapso proxy
-    const imgRes = await fetch(downloadUrl, {
-      headers: { 'X-API-Key': apiKey }
-    })
+    const imgRes = await fetch(directUrl)
 
     if (!imgRes.ok) {
-      console.error(`❌ Failed to download media. Status: ${imgRes.status}`)
+      console.error(`❌ Failed to download image. Status: ${imgRes.status}`, await imgRes.text())
       return null
     }
 
-    // Convert to base64
     const arrayBuffer = await imgRes.arrayBuffer()
     const base64 = Buffer.from(arrayBuffer).toString('base64')
-    console.log(`✅ Media downloaded and base64 encoded (${Math.round(base64.length / 1024)}KB)`)
+    console.log(`✅ Image downloaded and base64 encoded (${Math.round(base64.length / 1024)}KB)`)
     return base64
   } catch (err) {
-    console.error('❌ Error downloading WhatsApp media:', err.message)
+    console.error('❌ Error downloading image:', err.message)
     return null
   }
 }
