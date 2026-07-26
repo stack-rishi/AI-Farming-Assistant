@@ -2,7 +2,7 @@ import express from 'express'
 import dotenv from 'dotenv'
 import { config } from './config.js'
 import { getFarmerDashboardContext } from './services/dashboardService.js'
-import { generateWhatsAppResponse, analyzeImageWithAI } from './services/aiService.js'
+import { generateWhatsAppResponse, analyzeImageWithAI, transcribeAudio } from './services/aiService.js'
 
 dotenv.config()
 
@@ -55,6 +55,14 @@ app.post('/kapso-webhook', async (req, res) => {
         return
       }
 
+      // Handle audio/voice note messages
+      if ((msgType === 'audio' || messageObj?.audio) && senderPhone) {
+        const mimeType = messageObj?.audio?.mime_type || 'audio/ogg; codecs=opus'
+        const directUrl = messageObj?.audio?.link || messageObj?.kapso?.media_url || messageObj?.kapso?.media_data?.url
+        await processAudioMessage(senderPhone, directUrl, mimeType, messageId)
+        return
+      }
+
       // Handle text messages
       const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
       if (incomingText && senderPhone) {
@@ -86,6 +94,14 @@ app.post('/kapso-webhook', async (req, res) => {
       continue
     }
 
+    // Handle audio/voice note messages
+    if ((msgType === 'audio' || messageObj?.audio) && senderPhone) {
+      const mimeType = messageObj?.audio?.mime_type || 'audio/ogg; codecs=opus'
+      const directUrl = messageObj?.audio?.link || messageObj?.kapso?.media_url || messageObj?.kapso?.media_data?.url
+      await processAudioMessage(senderPhone, directUrl, mimeType, messageId)
+      continue
+    }
+
     // Handle text messages
     const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
     if (incomingText && senderPhone) {
@@ -111,6 +127,14 @@ app.post('/kapso-webhook', async (req, res) => {
           const caption = msg?.image?.caption || ''
           const directUrl = msg?.image?.link || msg?.image?.url
           await processImageMessage(senderPhone, directUrl, mimeType, caption, messageId)
+          continue
+        }
+
+        // Handle audio/voice note messages
+        if (msgType === 'audio' && senderPhone) {
+          const mimeType = msg?.audio?.mime_type || 'audio/ogg; codecs=opus'
+          const directUrl = msg?.audio?.link || msg?.audio?.url
+          await processAudioMessage(senderPhone, directUrl, mimeType, messageId)
           continue
         }
 
@@ -178,10 +202,73 @@ async function processImageMessage(senderPhone, directUrl, mimeType, caption, me
 }
 
 /**
- * Download image from the direct Kapso pre-signed URL and return base64-encoded string.
- * Kapso provides the full direct URL in the webhook payload — no extra API call needed.
+ * Process a voice note / audio WhatsApp message.
+ * Downloads audio, transcribes via Groq Whisper, then answers with the 70B text model.
  */
+async function processAudioMessage(senderPhone, directUrl, mimeType, messageId) {
+  console.log(`\n🎙️ [${new Date().toISOString()}] Voice note from [${senderPhone}] | URL: ${directUrl}`)
+
+  try {
+    if (messageId) markMessageAsRead(messageId)
+
+    // Acknowledge immediately
+    await sendKapsoReply(senderPhone, `🎙️ Got your voice note! Transcribing and analyzing...\n\nJust a moment! 🌾`)
+
+    // Download audio bytes
+    const audioBuffer = await downloadWhatsAppMediaAsBuffer(directUrl)
+    if (!audioBuffer) {
+      await sendKapsoReply(senderPhone, `⚠️ Sorry, I could not process your voice note. Please try sending it again or type your question!`)
+      return
+    }
+
+    // Transcribe with Groq Whisper
+    const transcript = await transcribeAudio(audioBuffer, mimeType)
+    if (!transcript) {
+      await sendKapsoReply(senderPhone, `⚠️ I heard your voice note but could not understand it clearly. Please try again or type your question!`)
+      return
+    }
+
+    console.log(`📝 Transcript: "${transcript}"`)
+
+    // Show the farmer what was heard, then answer
+    const farmerContext = await getFarmerDashboardContext(senderPhone)
+    const reply = await generateWhatsAppResponse(transcript, farmerContext)
+
+    await sendKapsoReply(senderPhone, `🎙️ *I heard:* "${transcript}"\n\n${reply}`)
+  } catch (error) {
+    console.error('❌ Error processing voice note:', error)
+    await sendKapsoReply(senderPhone, `⚠️ Something went wrong processing your voice note. Please type your question and I will help!`)
+  }
+}
+
+
+/**
+ * Download media from a Kapso direct URL and return a raw Buffer (used for Whisper audio transcription).
+ */
+async function downloadWhatsAppMediaAsBuffer(directUrl) {
+  if (!directUrl) {
+    console.error('❌ No audio URL provided')
+    return null
+  }
+  try {
+    console.log(`📥 Downloading audio from Kapso URL: ${directUrl}`)
+    const res = await fetch(directUrl)
+    if (!res.ok) {
+      console.error(`❌ Failed to download audio. Status: ${res.status}`, await res.text())
+      return null
+    }
+    const arrayBuffer = await res.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    console.log(`✅ Audio downloaded (${Math.round(buffer.length / 1024)}KB)`)
+    return buffer
+  } catch (err) {
+    console.error('❌ Error downloading audio:', err.message)
+    return null
+  }
+}
+
 async function downloadWhatsAppMedia(directUrl) {
+
   if (!directUrl) {
     console.error('❌ No image URL provided')
     return null

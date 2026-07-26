@@ -3,9 +3,51 @@ import { config } from '../config.js'
 
 /**
  * AI Service for AgriMind WhatsApp Bot
- * Text: llama-3.3-70b-versatile (best free tier text model)
- * Vision: qwen/qwen3.6-27b with reasoning_effort: none (no thinking leakage)
+ * Text:    llama-3.3-70b-versatile  (best free tier text model)
+ * Vision:  qwen/qwen3.6-27b         (vision-capable, reasoning_effort: none)
+ * Speech:  whisper-large-v3-turbo   (fastest Whisper on Groq free tier)
  */
+
+/**
+ * Transcribe a voice note using Groq Whisper.
+ * @param {Buffer} audioBuffer - Raw audio bytes
+ * @param {string} mimeType    - MIME type e.g. 'audio/ogg; codecs=opus'
+ * @returns {Promise<string|null>} Transcribed text or null on failure
+ */
+export async function transcribeAudio(audioBuffer, mimeType) {
+  if (!config.groqApiKey) return null
+
+  try {
+    const groq = new Groq({ apiKey: config.groqApiKey })
+
+    // Groq SDK needs a File object — derive a sensible filename from mimeType
+    const ext = mimeType.includes('ogg') ? 'ogg'
+      : mimeType.includes('mp4') ? 'mp4'
+      : mimeType.includes('mpeg') ? 'mp3'
+      : mimeType.includes('webm') ? 'webm'
+      : 'ogg'
+    const audioFile = new File([audioBuffer], `voice_note.${ext}`, { type: mimeType })
+
+    const transcription = await groq.audio.transcriptions.create({
+      file: audioFile,
+      model: 'whisper-large-v3-turbo',  // Fastest Whisper on Groq free tier
+      language: 'en',                    // Auto-detect works too — set to 'en' for speed
+      response_format: 'text',
+    })
+
+    const text = typeof transcription === 'string'
+      ? transcription.trim()
+      : transcription?.text?.trim()
+
+    console.log(`🎙️ Whisper transcript: "${text}"`)
+    return text || null
+  } catch (error) {
+    console.error('❌ Error transcribing audio with Whisper:', error.message)
+    return null
+  }
+}
+
+
 export async function generateWhatsAppResponse(userMessage, farmerContext) {
   const systemPrompt = `You are AgriMind AI, a WhatsApp farming assistant.
 CRITICAL RULE: You MUST speak entirely in ENGLISH by default. Do NOT use Hindi, Hinglish, or Marathi unless the user explicitly asks a question in those languages first.
