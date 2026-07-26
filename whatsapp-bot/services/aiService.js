@@ -30,7 +30,7 @@ Formatting Rules:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage }
         ],
-        model: 'llama-3.1-8b-instant',  // 3-4x faster than 70B for WhatsApp
+        model: 'llama-3.3-70b-versatile',  // Best quality model on free Groq tier (70B params)
         temperature: 0.6,
         max_tokens: 200,                 // WhatsApp needs short replies
       })

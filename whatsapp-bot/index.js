@@ -315,5 +315,5 @@ app.listen(PORT, () => {
   console.log(`\n🟢 AgriMind WhatsApp Bot running on http://localhost:${PORT}`)
   console.log(`📱 WhatsApp Number: +1 202-852-8477`)
   console.log(`🔗 Webhook: http://localhost:${PORT}/kapso-webhook`)
-  console.log(`🤖 AI: Groq llama-3.1-8b-instant + llama-4-scout Vision`)
+  console.log(`🤖 Text AI: Groq llama-3.3-70b-versatile | Vision AI: qwen3.6-27b`)
 })
