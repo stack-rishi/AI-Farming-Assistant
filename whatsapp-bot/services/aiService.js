@@ -3,8 +3,8 @@ import { config } from '../config.js'
 
 /**
  * AI Service for AgriMind WhatsApp Bot
- * Uses Groq hosted Llama models (currently llama-3.1-8b-instant).
- * Vision analysis uses meta-llama/llama-4-scout-17b-16e-instruct.
+ * Text: llama-3.3-70b-versatile (best free tier text model)
+ * Vision: qwen/qwen3.6-27b with reasoning_effort: none (no thinking leakage)
  */
 export async function generateWhatsAppResponse(userMessage, farmerContext) {
   const systemPrompt = `You are AgriMind AI, a WhatsApp farming assistant.
@@ -32,7 +32,7 @@ Formatting Rules:
         ],
         model: 'llama-3.3-70b-versatile',  // Best quality model on free Groq tier (70B params)
         temperature: 0.6,
-        max_tokens: 200,                 // WhatsApp needs short replies
+        max_tokens: 200,
       })
       const content = chatCompletion.choices[0]?.message?.content
       if (content) return content
@@ -46,7 +46,8 @@ Formatting Rules:
 }
 
 /**
- * Analyze a crop/field image using Groq Vision (llama-4-scout).
+ * Analyze a crop/field image using Groq Vision (qwen/qwen3.6-27b).
+ * Uses reasoning_effort: 'none' to suppress the thinking model's internal monologue.
  * @param {string} imageBase64 - base64-encoded image string
  * @param {string} mimeType    - MIME type e.g. 'image/jpeg'
  * @param {object} farmerContext - live farmer dashboard context
@@ -62,23 +63,23 @@ export async function analyzeImageWithAI(imageBase64, mimeType, farmerContext) {
   const location = farmerContext.farmer.location
 
   const systemPrompt = `You are AgriMind AI, an expert agricultural plant pathologist and crop advisor.
-CRITICAL RULE: Respond only in ENGLISH unless the farmer writes in another language first.
+CRITICAL RULE: Respond ONLY in ENGLISH unless the farmer writes in another language.
+CRITICAL RULE: Output ONLY the final WhatsApp message. No thinking, no planning, no draft sections, no numbered internal notes. Start directly with your greeting to the farmer.
 
 Farmer: ${name} | Location: ${location} | Active Crops: ${crops}
 Soil Moisture: ${farmerContext.realtimeSensors.soilMoisture.value}% (${farmerContext.realtimeSensors.soilMoisture.status})
 Temperature: ${farmerContext.realtimeSensors.temperature.value}°C | Humidity: ${farmerContext.realtimeSensors.humidity.value}%
 
-Your job is to analyze the image the farmer sent and provide:
-1. What you can see in the image (plant, leaf, field, pest, soil, etc.)
-2. Any visible problems: disease, pest damage, nutrient deficiency, weed infestation, or water stress
-3. Specific actionable recommendation: treatment, pesticide, fertilizer, or care step with dosage if possible
-4. Urgency level: Low / Medium / High
+Analyze the image and write a WhatsApp message covering:
+- What you see (crop/plant/condition)
+- The diagnosis (disease, pest, stress, deficiency)
+- One specific action with dosage/treatment
+- Urgency: Low / Medium / High
 
-Formatting Rules:
-- DO NOT use markdown like ** or #.
-- Use single * for *bold* sparingly.
-- Keep response under 200 words, well-spaced for WhatsApp readability.
-- If the image is not a crop or farming related image, politely say so and ask them to send a plant/field photo.`
+Formatting:
+- DO NOT use ** or #. WhatsApp does not support them.
+- Use single *word* for bold sparingly.
+- Keep it under 160 words, well-spaced.`
 
   try {
     const groq = new Groq({ apiKey: config.groqApiKey })
@@ -97,20 +98,24 @@ Formatting Rules:
             },
             {
               type: 'text',
-              text: 'Please analyze this image from my farm and give me your expert diagnosis and recommendation.'
+              text: 'Analyze this farm image. Reply with only the final WhatsApp message — no thinking or drafts.'
             }
           ]
         }
       ],
-      model: 'qwen/qwen3.6-27b',     // Vision-capable model available on free Groq tier
-      temperature: 0.4,
-      max_tokens: 1024,   // Thinking model needs extra tokens for <think> block + answer
+      model: 'qwen/qwen3.6-27b',
+      temperature: 0.3,
+      max_tokens: 512,
+      reasoning_effort: 'none',  // Disable Qwen thinking mode — output final answer only
     })
 
     const rawContent = chatCompletion.choices[0]?.message?.content
     if (rawContent) {
-      // Strip <think>...</think> reasoning blocks (Qwen thinking model outputs these)
-      const cleaned = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+      // Safety net: strip any leftover <think> blocks (closed or unclosed)
+      const cleaned = rawContent
+        .replace(/<think>[\s\S]*?<\/think>/gi, '')  // Remove complete think blocks
+        .replace(/<think>[\s\S]*/gi, '')              // Remove unclosed think blocks
+        .trim()
       return cleaned || rawContent.trim()
     }
 
