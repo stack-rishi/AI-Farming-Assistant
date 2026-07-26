@@ -104,11 +104,15 @@ Formatting Rules:
       ],
       model: 'qwen/qwen3.6-27b',     // Vision-capable model available on free Groq tier
       temperature: 0.4,
-      max_tokens: 300,
+      max_tokens: 1024,   // Thinking model needs extra tokens for <think> block + answer
     })
 
-    const content = chatCompletion.choices[0]?.message?.content
-    if (content) return content
+    const rawContent = chatCompletion.choices[0]?.message?.content
+    if (rawContent) {
+      // Strip <think>...</think> reasoning blocks (Qwen thinking model outputs these)
+      const cleaned = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+      return cleaned || rawContent.trim()
+    }
 
     return `🌾 I received your image, ${name}, but could not generate an analysis right now. Please try again or describe the problem in text.`
   } catch (error) {
