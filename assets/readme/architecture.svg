@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 380" width="100%" height="100%">
+  <defs>
+    <linearGradient id="archBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#031a14"/>
+      <stop offset="100%" stop-color="#062e24"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+    <linearGradient id="strokeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+
+    <filter id="nodeGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <style>
+    .title { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-weight: 700; font-size: 18px; fill: #ffffff; }
+    .node-title { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-weight: 700; font-size: 15px; fill: #34d399; }
+    .node-desc { font-family: 'Inter', system-ui, sans-serif; font-size: 12px; fill: #94a3b8; }
+    .arrow-text { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: #6ee7b7; text-anchor: middle; }
+  </style>
+
+  <!-- Background -->
+  <rect width="1100" height="380" rx="16" fill="url(#archBg)" stroke="#10b981" stroke-opacity="0.2" stroke-width="1"/>
+
+  <!-- Diagram Title -->
+  <text x="40" y="45" class="title">System Architecture &amp; Data Pipeline</text>
+  <line x1="40" y1="60" x2="1060" y2="60" stroke="#10b981" stroke-opacity="0.2" stroke-width="1"/>
+
+  <!-- Node 1: IoT Sensors & Farmer Devices -->
+  <g transform="translate(50, 110)">
+    <rect width="220" height="200" rx="14" fill="url(#nodeGrad)" stroke="url(#strokeGrad)" stroke-width="1.5" filter="url(#nodeGlow)"/>
+    <text x="20" y="35" font-size="28">🌾 📡</text>
+    <text x="20" y="70" class="node-title">Field Inputs &amp; User</text>
+    <text x="20" y="95" class="node-desc">• IoT Soil Sensors (Moisture/pH)</text>
+    <text x="20" y="115" class="node-desc">• Weather Stations (Temp/Rain)</text>
+    <text x="20" y="135" class="node-desc">• Farmer WhatsApp Messages</text>
+    <text x="20" y="155" class="node-desc">• Web Dashboard User</text>
+  </g>
+
+  <!-- Connection 1 -> 2 -->
+  <path d="M 270 210 L 340 210" stroke="#10b981" stroke-width="2" stroke-dasharray="6,4"/>
+  <polygon points="340,205 350,210 340,215" fill="#10b981"/>
+  <text x="310" y="195" class="arrow-text">Webhook / REST</text>
+
+  <!-- Node 2: Gateway / Kapso Proxy -->
+  <g transform="translate(350, 110)">
+    <rect width="200" height="200" rx="14" fill="url(#nodeGrad)" stroke="url(#strokeGrad)" stroke-width="1.5"/>
+    <text x="20" y="35" font-size="28">⚡ 💬</text>
+    <text x="20" y="70" class="node-title">API Gateway</text>
+    <text x="20" y="95" class="node-desc">• Kapso Cloud API Proxy</text>
+    <text x="20" y="115" class="node-desc">• Meta WhatsApp Infra</text>
+    <text x="20" y="135" class="node-desc">• Event Parser (Inbound)</text>
+    <text x="20" y="155" class="node-desc">• SSL Security Layer</text>
+  </g>
+
+  <!-- Connection 2 -> 3 -->
+  <path d="M 550 210 L 620 210" stroke="#10b981" stroke-width="2" stroke-dasharray="6,4"/>
+  <polygon points="620,205 630,210 620,215" fill="#10b981"/>
+  <text x="585" y="195" class="arrow-text">JSON Payload</text>
+
+  <!-- Node 3: Backend Server (AWS EC2) -->
+  <g transform="translate(630, 110)">
+    <rect width="220" height="200" rx="14" fill="url(#nodeGrad)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="20" y="35" font-size="28">☁️ 🖥️</text>
+    <text x="20" y="70" class="node-title" fill="#fbbf24">AWS EC2 Server</text>
+    <text x="20" y="95" class="node-desc">• Node.js / Express Engine</text>
+    <text x="20" y="115" class="node-desc">• PM2 Daemon Process</text>
+    <text x="20" y="135" class="node-desc">• Farmer Context Service</text>
+    <text x="20" y="155" class="node-desc">• Docker Container Mesh</text>
+  </g>
+
+  <!-- Connection 3 -> 4 -->
+  <path d="M 850 210 L 910 210" stroke="#10b981" stroke-width="2" stroke-dasharray="6,4"/>
+  <polygon points="910,205 920,210 910,215" fill="#10b981"/>
+  <text x="880" y="195" class="arrow-text">Prompt</text>
+
+  <!-- Node 4: AI Brain (Groq LLM) -->
+  <g transform="translate(920, 110)">
+    <rect width="140" height="200" rx="14" fill="url(#nodeGrad)" stroke="url(#strokeGrad)" stroke-width="1.5"/>
+    <text x="20" y="35" font-size="28">🤖 🧠</text>
+    <text x="20" y="70" class="node-title">Groq AI</text>
+    <text x="20" y="95" class="node-desc">• Llama 3.3 70B</text>
+    <text x="20" y="115" class="node-desc">• Llama 8B Fast</text>
+    <text x="20" y="135" class="node-desc">• &lt;1.2s Latency</text>
+  </g>
+</svg>

@@ -1,0 +1,421 @@
+import express from 'express'
+import dotenv from 'dotenv'
+import { config } from './config.js'
+import { getFarmerDashboardContext } from './services/dashboardService.js'
+import { generateWhatsAppResponse, analyzeImageWithAI, transcribeAudio } from './services/aiService.js'
+import { getHistory, addExchange, detectAndSaveLanguage, getPreference } from './services/conversationService.js'
+
+dotenv.config()
+
+const app = express()
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+const PORT = config.port
+
+// Health check endpoint (Render uses this to keep the service alive)
+app.get('/', (req, res) => {
+  res.json({ status: 'online', service: 'AgriMind WhatsApp Bot' })
+})
+
+// GET verification endpoint (Kapso may ping this)
+app.get('/kapso-webhook', (req, res) => {
+  console.log('✅ Webhook verification GET:', req.query)
+  res.status(200).send(req.query['hub.challenge'] || req.query.challenge || 'OK')
+})
+
+/**
+ * Kapso Webhook Receiver (POST /kapso-webhook)
+ * Receives incoming WhatsApp messages (text & images) from Kapso and replies with Groq AI.
+ */
+app.post('/kapso-webhook', async (req, res) => {
+  res.status(200).json({ status: 'received' })
+
+  const body = req.body
+  if (!body) return
+
+  console.log('📩 RAW WEBHOOK BODY:', JSON.stringify(body, null, 2))
+
+  // 1. Support Kapso non-debounced payload (body.message)
+  if (body.message) {
+    const messageObj = body.message
+    const direction = messageObj?.kapso?.direction
+
+    if (direction === 'inbound') {
+      const senderPhone = messageObj?.from
+      const messageId = messageObj?.id
+      const msgType = messageObj?.type
+
+      // Handle image messages — Kapso provides direct download URL in the payload
+      if ((msgType === 'image' || messageObj?.image) && senderPhone) {
+        const mimeType = messageObj?.image?.mime_type || 'image/jpeg'
+        const caption = messageObj?.image?.caption || ''
+        // Use Kapso's pre-signed direct URL (no separate API call needed)
+        const directUrl = messageObj?.image?.link || messageObj?.kapso?.media_url || messageObj?.kapso?.media_data?.url
+        await processImageMessage(senderPhone, directUrl, mimeType, caption, messageId)
+        return
+      }
+
+      // Handle audio/voice note messages
+      if ((msgType === 'audio' || messageObj?.audio) && senderPhone) {
+        const mimeType = messageObj?.audio?.mime_type || 'audio/ogg; codecs=opus'
+        const directUrl = messageObj?.audio?.link || messageObj?.kapso?.media_url || messageObj?.kapso?.media_data?.url
+        await processAudioMessage(senderPhone, directUrl, mimeType, messageId)
+        return
+      }
+
+      // Handle text messages
+      const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
+      if (incomingText && senderPhone) {
+        await processMessage(senderPhone, incomingText, messageId)
+        return
+      }
+    }
+  }
+
+  // 2. Support Kapso debounced data[] array format
+  const dataItems = body.data || []
+  for (const dataItem of dataItems) {
+    const messageObj = dataItem?.message
+    if (!messageObj) continue
+
+    const direction = messageObj?.kapso?.direction
+    if (direction && direction !== 'inbound') continue
+
+    const senderPhone = messageObj?.from || dataItem?.conversation?.phone_number
+    const messageId = messageObj?.id
+    const msgType = messageObj?.type
+
+    // Handle image messages — use Kapso's direct URL from the payload
+    if ((msgType === 'image' || messageObj?.image) && senderPhone) {
+      const mimeType = messageObj?.image?.mime_type || 'image/jpeg'
+      const caption = messageObj?.image?.caption || ''
+      const directUrl = messageObj?.image?.link || messageObj?.kapso?.media_url || messageObj?.kapso?.media_data?.url
+      await processImageMessage(senderPhone, directUrl, mimeType, caption, messageId)
+      continue
+    }
+
+    // Handle audio/voice note messages
+    if ((msgType === 'audio' || messageObj?.audio) && senderPhone) {
+      const mimeType = messageObj?.audio?.mime_type || 'audio/ogg; codecs=opus'
+      const directUrl = messageObj?.audio?.link || messageObj?.kapso?.media_url || messageObj?.kapso?.media_data?.url
+      await processAudioMessage(senderPhone, directUrl, mimeType, messageId)
+      continue
+    }
+
+    // Handle text messages
+    const incomingText = messageObj?.text?.body || messageObj?.kapso?.content
+    if (incomingText && senderPhone) {
+      await processMessage(senderPhone, incomingText, messageId)
+    }
+  }
+
+  // 3. Support Meta raw webhook format (body.entry[0].changes[0].value.messages[0])
+  const entries = body.entry || []
+  for (const entry of entries) {
+    const changes = entry?.changes || []
+    for (const change of changes) {
+      const value = change?.value
+      const messages = value?.messages || []
+      for (const msg of messages) {
+        const senderPhone = msg?.from
+        const messageId = msg?.id
+        const msgType = msg?.type
+
+        // Handle image messages — use direct URL if provided
+        if (msgType === 'image' && senderPhone) {
+          const mimeType = msg?.image?.mime_type || 'image/jpeg'
+          const caption = msg?.image?.caption || ''
+          const directUrl = msg?.image?.link || msg?.image?.url
+          await processImageMessage(senderPhone, directUrl, mimeType, caption, messageId)
+          continue
+        }
+
+        // Handle audio/voice note messages
+        if (msgType === 'audio' && senderPhone) {
+          const mimeType = msg?.audio?.mime_type || 'audio/ogg; codecs=opus'
+          const directUrl = msg?.audio?.link || msg?.audio?.url
+          await processAudioMessage(senderPhone, directUrl, mimeType, messageId)
+          continue
+        }
+
+        // Handle text messages
+        const incomingText = msg?.text?.body
+        if (incomingText && senderPhone) {
+          await processMessage(senderPhone, incomingText, messageId)
+        }
+      }
+    }
+  }
+})
+
+/**
+ * Process a plain text WhatsApp message.
+ */
+async function processMessage(senderPhone, incomingText, messageId) {
+  console.log(`\n🌾 [${new Date().toISOString()}] Text from [${senderPhone}]: "${incomingText}"`)
+
+  try {
+    if (messageId) markMessageAsRead(messageId)
+    sendTypingIndicator(senderPhone)
+
+    // Detect language and load conversation history
+    const userLanguage = detectAndSaveLanguage(senderPhone, incomingText)
+    const history = getHistory(senderPhone)
+
+    const farmerContext = await getFarmerDashboardContext(senderPhone)
+    const replyText = await generateWhatsAppResponse(incomingText, farmerContext, history, userLanguage)
+    console.log(`🤖 AI Reply:\n${replyText}\n`)
+
+    await sendKapsoReply(senderPhone, replyText)
+
+    // Save this exchange to memory
+    addExchange(senderPhone, incomingText, replyText)
+  } catch (error) {
+    console.error('❌ Error processing text message:', error)
+  }
+}
+
+/**
+ * Process an image WhatsApp message.
+ * Downloads the image from WhatsApp media servers via Kapso proxy, then runs Groq Vision analysis.
+ */
+async function processImageMessage(senderPhone, directUrl, mimeType, caption, messageId) {
+  console.log(`\n📸 [${new Date().toISOString()}] Image from [${senderPhone}] | URL: ${directUrl} | Caption: "${caption}"`)
+
+  try {
+    if (messageId) markMessageAsRead(messageId)
+
+    // Send an immediate acknowledgement so the farmer knows we're working
+    await sendKapsoReply(senderPhone, `📸 Got your image! Analyzing it with AgriMind AI...\n\nThis takes a few seconds. Stand by! 🌾`)
+
+    // Download image bytes from the direct Kapso URL and convert to base64
+    const imageBase64 = await downloadWhatsAppMedia(directUrl)
+
+    if (!imageBase64) {
+      await sendKapsoReply(senderPhone, `⚠️ Sorry, I could not download your image. Please try sending it again, or describe your crop issue in text and I will help you!`)
+      return
+    }
+
+    // Analyze image with Groq Vision AI
+    const farmerContext = await getFarmerDashboardContext(senderPhone)
+    const analysis = await analyzeImageWithAI(imageBase64, mimeType, farmerContext)
+
+    console.log(`🔬 Vision Analysis:\n${analysis}\n`)
+    await sendKapsoReply(senderPhone, analysis)
+  } catch (error) {
+    console.error('❌ Error processing image message:', error)
+    await sendKapsoReply(senderPhone, `⚠️ Something went wrong while analyzing your image. Please try again or describe the crop issue in text!`)
+  }
+}
+
+/**
+ * Process a voice note / audio WhatsApp message.
+ * Downloads audio, transcribes via Groq Whisper, then answers with the 70B text model.
+ */
+async function processAudioMessage(senderPhone, directUrl, mimeType, messageId) {
+  console.log(`\n🎙️ [${new Date().toISOString()}] Voice note from [${senderPhone}] | URL: ${directUrl}`)
+
+  try {
+    if (messageId) markMessageAsRead(messageId)
+
+    // Acknowledge immediately
+    await sendKapsoReply(senderPhone, `🎙️ Got your voice note! Transcribing and analyzing...\n\nJust a moment! 🌾`)
+
+    // Download audio bytes
+    const audioBuffer = await downloadWhatsAppMediaAsBuffer(directUrl)
+    if (!audioBuffer) {
+      await sendKapsoReply(senderPhone, `⚠️ Sorry, I could not process your voice note. Please try sending it again or type your question!`)
+      return
+    }
+
+    // Transcribe with Groq Whisper
+    const transcript = await transcribeAudio(audioBuffer, mimeType)
+    if (!transcript) {
+      await sendKapsoReply(senderPhone, `⚠️ I heard your voice note but could not understand it clearly. Please try again or type your question!`)
+      return
+    }
+
+    console.log(`📝 Transcript: "${transcript}"`)
+
+    // Load history and detect language from transcript
+    const userLanguage = detectAndSaveLanguage(senderPhone, transcript)
+    const history = getHistory(senderPhone)
+
+    // Show the farmer what was heard, then answer
+    const farmerContext = await getFarmerDashboardContext(senderPhone)
+    const reply = await generateWhatsAppResponse(transcript, farmerContext, history, userLanguage)
+
+    await sendKapsoReply(senderPhone, `🎙️ *I heard:* "${transcript}"\n\n${reply}`)
+
+    // Save exchange to memory (store the transcript as the user message)
+    addExchange(senderPhone, transcript, reply)
+  } catch (error) {
+    console.error('❌ Error processing voice note:', error)
+    await sendKapsoReply(senderPhone, `⚠️ Something went wrong processing your voice note. Please type your question and I will help!`)
+  }
+}
+
+
+/**
+ * Download media from a Kapso direct URL and return a raw Buffer (used for Whisper audio transcription).
+ */
+async function downloadWhatsAppMediaAsBuffer(directUrl) {
+  if (!directUrl) {
+    console.error('❌ No audio URL provided')
+    return null
+  }
+  try {
+    console.log(`📥 Downloading audio from Kapso URL: ${directUrl}`)
+    const res = await fetch(directUrl)
+    if (!res.ok) {
+      console.error(`❌ Failed to download audio. Status: ${res.status}`, await res.text())
+      return null
+    }
+    const arrayBuffer = await res.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    console.log(`✅ Audio downloaded (${Math.round(buffer.length / 1024)}KB)`)
+    return buffer
+  } catch (err) {
+    console.error('❌ Error downloading audio:', err.message)
+    return null
+  }
+}
+
+async function downloadWhatsAppMedia(directUrl) {
+
+  if (!directUrl) {
+    console.error('❌ No image URL provided')
+    return null
+  }
+
+  try {
+    console.log(`📥 Downloading image from Kapso URL: ${directUrl}`)
+
+    const imgRes = await fetch(directUrl)
+
+    if (!imgRes.ok) {
+      console.error(`❌ Failed to download image. Status: ${imgRes.status}`, await imgRes.text())
+      return null
+    }
+
+    const arrayBuffer = await imgRes.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    console.log(`✅ Image downloaded and base64 encoded (${Math.round(base64.length / 1024)}KB)`)
+    return base64
+  } catch (err) {
+    console.error('❌ Error downloading image:', err.message)
+    return null
+  }
+}
+
+/**
+ * Mark incoming message as READ (Triggers double blue ticks on sender's phone)
+ */
+async function markMessageAsRead(messageId) {
+  const apiKey = config.kapsoApiKey
+  const phoneNumberId = config.kapsoPhoneNumberId
+  if (!apiKey || !messageId) return
+
+  const url = `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: messageId,
+      }),
+    })
+    const txt = await res.text()
+    console.log(`✓✓ Mark Read Status (${res.status}): ${txt}`)
+  } catch (err) {
+    console.error('❌ Error marking message read:', err.message)
+  }
+}
+
+/**
+ * Send Typing Indicator (Shows "typing..." under bot name while generating response)
+ */
+async function sendTypingIndicator(recipientPhone) {
+  const apiKey = config.kapsoApiKey
+  const phoneNumberId = config.kapsoPhoneNumberId
+  if (!apiKey || !recipientPhone) return
+
+  const url = `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipientPhone,
+        type: 'typing_indicator',
+        typing_indicator: {
+          type: 'text'
+        }
+      }),
+    })
+    const txt = await res.text()
+    console.log(`💬 Typing Indicator Status (${res.status}): ${txt}`)
+  } catch (err) {
+    console.error('❌ Error sending typing indicator:', err.message)
+  }
+}
+
+/**
+ * Send WhatsApp reply via Kapso Official API
+ */
+async function sendKapsoReply(recipientPhone, text) {
+  const apiKey = config.kapsoApiKey
+  const phoneNumberId = config.kapsoPhoneNumberId
+
+  if (!apiKey) {
+    console.log(`⚠️ KAPSO_API_KEY missing. Reply not sent.`)
+    return
+  }
+
+  const url = `https://api.kapso.ai/meta/whatsapp/v24.0/${phoneNumberId}/messages`
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: recipientPhone,
+        type: 'text',
+        text: { body: text },
+      }),
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log(`📤 Reply delivered to [${recipientPhone}]! ID: ${data.messages?.[0]?.id || 'sent'}`)
+    } else {
+      const errorText = await response.text()
+      console.error(`❌ Kapso API Error (${response.status}):`, errorText)
+    }
+  } catch (err) {
+    console.error('❌ Network error:', err.message)
+  }
+}
+
+app.listen(PORT, () => {
+  console.log(`\n🟢 AgriMind WhatsApp Bot running on http://localhost:${PORT}`)
+  console.log(`📱 WhatsApp Number: +1 202-852-8477`)
+  console.log(`🔗 Webhook: http://localhost:${PORT}/kapso-webhook`)
+  console.log(`🤖 Text AI: Groq llama-3.3-70b-versatile | Vision AI: qwen3.6-27b`)
+})

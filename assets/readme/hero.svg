@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#022c22"/>
+      <stop offset="50%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#021f18"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="50%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#a7f3d0"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.03"/>
+    </linearGradient>
+    <linearGradient id="cardBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.1"/>
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="15" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+    <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <style>
+    .title { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif; font-weight: 800; font-size: 54px; fill: url(#accentGrad); }
+    .subtitle { font-family: 'Inter', system-ui, -apple-system, sans-serif; font-weight: 500; font-size: 20px; fill: #ecfdf5; letter-spacing: 0.2px; }
+    .tag { font-family: 'JetBrains Mono', monospace, sans-serif; font-weight: 600; font-size: 13px; fill: #10b981; text-transform: uppercase; letter-spacing: 2px; }
+    .stat-val { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-weight: 700; font-size: 24px; fill: #ffffff; }
+    .stat-lbl { font-family: 'Inter', system-ui, sans-serif; font-weight: 500; font-size: 12px; fill: #6ee7b7; }
+    .badge-txt { font-family: 'Inter', system-ui, sans-serif; font-weight: 600; font-size: 13px; fill: #ecfdf5; }
+  </style>
+
+  <!-- Background -->
+  <rect width="1200" height="420" rx="24" fill="url(#bgGrad)"/>
+
+  <!-- Decorative Grid Overlay -->
+  <g opacity="0.05" stroke="#ffffff" stroke-width="1">
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40"/>
+    </pattern>
+    <rect width="1200" height="420" fill="url(#grid)"/>
+  </g>
+
+  <!-- Glowing Ambient Circles -->
+  <circle cx="200" cy="100" r="180" fill="#10b981" opacity="0.15" filter="url(#glow)"/>
+  <circle cx="1000" cy="300" r="220" fill="#059669" opacity="0.18" filter="url(#glow)"/>
+  <circle cx="600" cy="380" r="150" fill="#f59e0b" opacity="0.08" filter="url(#glow)"/>
+
+  <!-- Content Container (Left Side) -->
+  <g transform="translate(60, 65)">
+    <!-- Category Pill -->
+    <rect x="0" y="0" width="210" height="32" rx="16" fill="url(#glassGrad)" stroke="url(#cardBorder)" stroke-width="1.5"/>
+    <circle cx="16" cy="16" r="5" fill="#10b981" filter="url(#glow)"/>
+    <text x="30" y="21" class="tag">AI FARMING PLATFORM</text>
+
+    <!-- Main Title -->
+    <text x="0" y="90" class="title" filter="url(#softShadow)">AgriMind AI</text>
+
+    <!-- Subtitle -->
+    <text x="0" y="130" class="subtitle">Next-Gen Intelligent SaaS Dashboard &amp; Autonomous WhatsApp Assistant</text>
+
+    <!-- Feature Badges -->
+    <g transform="translate(0, 165)">
+      <!-- Badge 1 -->
+      <rect x="0" y="0" width="165" height="36" rx="10" fill="url(#glassGrad)" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+      <text x="15" y="23" class="badge-txt">🌱 IoT Sensor Mesh</text>
+
+      <!-- Badge 2 -->
+      <rect x="177" y="0" width="175" height="36" rx="10" fill="url(#glassGrad)" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+      <text x="192" y="23" class="badge-txt">💬 WhatsApp AI Bot</text>
+
+      <!-- Badge 3 -->
+      <rect x="364" y="0" width="165" height="36" rx="10" fill="url(#glassGrad)" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+      <text x="379" y="23" class="badge-txt">🩺 AI Crop Doctor</text>
+
+      <!-- Badge 4 -->
+      <rect x="541" y="0" width="165" height="36" rx="10" fill="url(#glassGrad)" stroke="#10b981" stroke-opacity="0.3" stroke-width="1"/>
+      <text x="556" y="23" class="badge-txt">⚡ Groq Llama 3.3</text>
+    </g>
+
+    <!-- Quick Stats Cards Row -->
+    <g transform="translate(0, 230)">
+      <!-- Stat 1 -->
+      <g filter="url(#softShadow)">
+        <rect x="0" y="0" width="220" height="75" rx="14" fill="url(#glassGrad)" stroke="url(#cardBorder)" stroke-width="1.5"/>
+        <text x="20" y="38" class="stat-val">68% <tspan fill="#34d399" font-size="14">Optimal</tspan></text>
+        <text x="20" y="58" class="stat-lbl">REALTIME SOIL MOISTURE</text>
+      </g>
+
+      <!-- Stat 2 -->
+      <g transform="translate(235, 0)" filter="url(#softShadow)">
+        <rect x="0" y="0" width="220" height="75" rx="14" fill="url(#glassGrad)" stroke="url(#cardBorder)" stroke-width="1.5"/>
+        <text x="20" y="38" class="stat-val">94.2% <tspan fill="#fbbf24" font-size="14">Confidence</tspan></text>
+        <text x="20" y="58" class="stat-lbl">DISEASE DIAGNOSIS ACCURACY</text>
+      </g>
+
+      <!-- Stat 3 -->
+      <g transform="translate(470, 0)" filter="url(#softShadow)">
+        <rect x="0" y="0" width="220" height="75" rx="14" fill="url(#glassGrad)" stroke="url(#cardBorder)" stroke-width="1.5"/>
+        <text x="20" y="38" class="stat-val">&lt; 1.2s <tspan fill="#6ee7b7" font-size="14">Instant</tspan></text>
+        <text x="20" y="58" class="stat-lbl">WHATSAPP LATENCY (GROQ)</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Right Visual / Mockup Illustration -->
+  <g transform="translate(790, 50)" filter="url(#softShadow)">
+    <!-- Phone Mockup Container -->
+    <rect x="0" y="0" width="340" height="320" rx="20" fill="#061f18" stroke="url(#cardBorder)" stroke-width="2"/>
+    
+    <!-- Phone Header -->
+    <path d="M 0 20 Q 0 0 20 0 L 320 0 Q 340 0 340 20 L 340 50 L 0 50 Z" fill="#041712"/>
+    <circle cx="25" cy="25" r="14" fill="#059669"/>
+    <text x="22" y="29" font-family="sans-serif" font-weight="bold" font-size="12" fill="#ffffff">🌾</text>
+    <text x="48" y="24" font-family="'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="14" fill="#ffffff">AgriMind WhatsApp</text>
+    <text x="48" y="39" font-family="sans-serif" font-size="11" fill="#34d399">● Online (AI Agent)</text>
+
+    <!-- Chat Message 1 (Incoming) -->
+    <g transform="translate(15, 65)">
+      <rect x="0" y="0" width="220" height="50" rx="12" fill="#0f2922" stroke="#059669" stroke-opacity="0.3"/>
+      <text x="12" y="22" font-family="sans-serif" font-size="12" fill="#e2e8f0">Should I irrigate my wheat</text>
+      <text x="12" y="38" font-family="sans-serif" font-size="12" fill="#e2e8f0">crop today?</text>
+      <text x="185" y="42" font-family="sans-serif" font-size="9" fill="#64748b">10:42 AM</text>
+    </g>
+
+    <!-- Chat Message 2 (AI Response) -->
+    <g transform="translate(45, 125)">
+      <rect x="0" y="0" width="280" height="110" rx="12" fill="#054e3b" stroke="#10b981" stroke-opacity="0.5"/>
+      <text x="12" y="22" font-family="sans-serif" font-weight="bold" font-size="12" fill="#34d399">🤖 AgriMind AI</text>
+      <text x="12" y="42" font-family="sans-serif" font-size="11.5" fill="#f0fdf4">• *Soil Moisture:* 68% (Optimal)</text>
+      <text x="12" y="60" font-family="sans-serif" font-size="11.5" fill="#f0fdf4">• *Rain Forecast:* 70% chance rain</text>
+      <text x="12" y="78" font-family="sans-serif" font-size="11.5" fill="#f0fdf4">• *Action:* Skip irrigation today!</text>
+      <text x="240" y="102" font-family="sans-serif" font-size="9" fill="#a7f3d0">10:42 AM ✓✓</text>
+    </g>
+
+    <!-- Live Sensor Pulse Card -->
+    <g transform="translate(15, 245)">
+      <rect x="0" y="0" width="310" height="60" rx="12" fill="url(#glassGrad)" stroke="#10b981" stroke-opacity="0.4"/>
+      <text x="15" y="24" font-family="sans-serif" font-weight="bold" font-size="12" fill="#ffffff">📡 IoT Live Feed</text>
+      <text x="15" y="44" font-family="sans-serif" font-size="11" fill="#34d399">Temp: 28°C  |  pH: 6.8  |  Humidity: 65%</text>
+      <!-- Sparkline path -->
+      <path d="M 210 35 Q 230 15 240 30 T 270 20 T 300 35" fill="none" stroke="#34d399" stroke-width="2" filter="url(#glow)"/>
+    </g>
+  </g>
+</svg>

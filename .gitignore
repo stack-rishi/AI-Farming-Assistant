@@ -1,5 +1,33 @@
-node_modules
-dist
-.DS_Store
-*.log
+# Dependencies
+node_modules/
+whatsapp-bot/node_modules/
+
+# Build output
+dist/
+
+# Environment files — NEVER commit these
 .env
+.env.local
+.env.production
+.env.staging
+whatsapp-bot/.env
+
+# SSH Keys — NEVER commit these
+*.pem
+*.key
+*.pub
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Conversation memory (user chat history — never commit to GitHub)
+whatsapp-bot/data/
+
+# Editor directories
+.vscode/
+.idea/

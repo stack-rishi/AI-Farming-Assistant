@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: agrimind-whatsapp-bot
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: KAPSO_API_KEY
+        sync: false
+      - key: KAPSO_PHONE_NUMBER_ID
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PORT
+        value: 3001
